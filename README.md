@@ -1,100 +1,90 @@
-# NestJS REST-to-gRPC microservices example
+# Very simple NestJS REST-to-gRPC example
 
-This repository contains two independent NestJS projects and no API gateway.
+This project has only two small services:
 
-The example models a realistic order workflow: a client creates an order through REST,
-then order-service reserves stock from inventory-service over gRPC. The order is saved
-only when the stock reservation succeeds.
+- `greeting-service`: receives a REST request from Swagger.
+- `hello-service`: receives a gRPC call and returns a hello message.
+
+There is no API gateway and no database.
 
 ```text
-Swagger / REST client
-        |
-        | POST /orders
-        v
-  order-service :3002
-        |
-        | ReserveInventory(sku, quantity) [gRPC]
-        v
-inventory-service :5001
-        |
-        | reserved / insufficient stock / unknown SKU
-        v
-  order confirmed or REST error returned
+Browser / Swagger
+       |
+       | GET /greetings/Junior (REST)
+       v
+greeting-service :3002
+       |
+       | SayHello({ name: "Junior" }) (gRPC)
+       v
+hello-service :5001
+       |
+       | { message: "Hello, Junior! 👋" }
+       v
+greeting-service returns the response
 ```
 
-Each service has its own `package.json`, lockfile, `.env`, Nest configuration, source
-tree, and protobuf contract. There are no shared runtime files between the projects.
-
-## Run
-
-Use two terminals:
+## 1. Start hello-service
 
 ```bash
-# terminal 1
-cd inventory-service
+cd hello-service
 npm ci
 npm run start:dev
 ```
 
+Its terminal will show:
+
+```text
+🚀 [HELLO SERVICE] HTTP running at http://localhost:3001
+🟢 [HELLO SERVICE] gRPC listening at 0.0.0.0:5001
+```
+
+## 2. Start greeting-service
+
+Open a second terminal:
+
 ```bash
-# terminal 2
-cd order-service
+cd greeting-service
 npm ci
 npm run start:dev
 ```
 
-## Test REST to gRPC from Swagger
+## 3. Test from Swagger
 
-Open order-service Swagger at `http://localhost:3002/swagger`. Execute `POST /orders`
-with:
+Open `http://localhost:3002/swagger`.
+
+1. Open `GET /greetings/{name}`.
+2. Click **Try it out**.
+3. Enter `Junior`.
+4. Click **Execute**.
+
+Response:
 
 ```json
 {
-  "customerName": "Ada Lovelace",
-  "sku": "LAPTOP-001",
-  "quantity": 2
+  "message": "Hello, Junior! 👋"
 }
 ```
 
-The REST request triggers this service-to-service gRPC call:
+The greeting-service terminal shows:
 
 ```text
-OrderHttpController
-  -> OrderService.create()
-  -> InventoryClient.reserve()
-  -> InventoryService.ReserveInventory() over gRPC
+🌐 [GREETING SERVICE] REST request received for: Junior
+📞 [GREETING SERVICE] Calling hello-service with gRPC...
+✅ [GREETING SERVICE] gRPC response received: Hello, Junior! 👋
 ```
 
-Seeded inventory:
+The hello-service terminal shows:
 
-| SKU | Name | Initial quantity |
-| --- | --- | ---: |
-| `LAPTOP-001` | Developer Laptop | 5 |
-| `MOUSE-001` | Wireless Mouse | 20 |
+```text
+📨 [HELLO SERVICE] gRPC request received for: Junior
+📤 [HELLO SERVICE] Sending gRPC response: Hello, Junior! 👋
+```
 
-Useful failure tests:
+That is the entire service-to-service call.
 
-- Request more than 5 laptops to receive HTTP `409 Conflict` from a gRPC
-  `FAILED_PRECONDITION` error.
-- Use an unknown SKU to receive HTTP `404 Not Found` from gRPC `NOT_FOUND`.
-- Stop inventory-service to receive HTTP `502 Bad Gateway` from order-service.
+## URLs
 
-## Documentation
-
-| Service | Swagger UI | Scalar | gRPC |
+| Service | Swagger | Scalar | gRPC |
 | --- | --- | --- | --- |
-| inventory-service | `http://localhost:3001/swagger` | `http://localhost:3001/reference` | `localhost:5001` |
-| order-service | `http://localhost:3002/swagger` | `http://localhost:3002/reference` | gRPC client |
-
-The inventory HTTP API lets you inspect current stock at `GET /inventory`. The actual
-order workflow uses gRPC, not that HTTP API, for reservations.
-
-## Verify
-
-Run inside either service directory:
-
-```bash
-npm run build
-npm test
-npm run lint
-```
+| hello-service | `http://localhost:3001/swagger` | `http://localhost:3001/reference` | `localhost:5001` |
+| greeting-service | `http://localhost:3002/swagger` | `http://localhost:3002/reference` | client only |
